@@ -6,3 +6,4 @@ serviceAccountKey.json
 .gcloudignore
 test
 new
+hello-temp-files/
