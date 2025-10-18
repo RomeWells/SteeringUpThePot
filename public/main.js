@@ -23,8 +23,13 @@ function displayMessage(sender, message) {
 }
 
 startBtn.onclick = async () => {
+  const apiKey = prompt("Enter your Gemini API Key:");
+  if (!apiKey) {
+    console.error("API key is required to connect to Gemini Live API.");
+    return;
+  }
   await setupCamera();
-  await initWebRTC(displayMessage);
+  await initWebRTC(displayMessage, apiKey);
   console.log('WebSocket connection initiated');
 };
 

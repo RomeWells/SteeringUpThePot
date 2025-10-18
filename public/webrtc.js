@@ -1,10 +1,52 @@
 
 let ws;
 let displayMessageCallback;
+let audioContext;
+let audioQueue = [];
+let isPlaying = false;
 
-export function initWebRTC(displayMessage) {
+async function playAudio(audioBlob) {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+
+  audioQueue.push(audioBlob);
+
+  if (!isPlaying) {
+    processQueue();
+  }
+}
+
+async function processQueue() {
+  if (audioQueue.length > 0 && !isPlaying) {
+    isPlaying = true;
+    const audioBlob = audioQueue.shift();
+    try {
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const audioBuffer = audioContext.createBuffer(1, arrayBuffer.byteLength / 2, 24000); // Assuming 1 channel, 16-bit PCM
+      const nowBuffering = audioBuffer.getChannelData(0);
+      const dataView = new DataView(arrayBuffer);
+      for (let i = 0; i < nowBuffering.length; i++) {
+        nowBuffering[i] = dataView.getInt16(i * 2, true) / 32768; // Read 16-bit little-endian, normalize
+      }
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContext.destination);
+      source.start(0);
+      source.onended = () => {
+        isPlaying = false;
+        processQueue();
+      };
+    } catch (error) {
+      console.error("Error decoding or playing audio:", error);
+      isPlaying = false;
+      processQueue();
+    }
+  }
+}
+
+export function initWebRTC(displayMessage, apiKey) {
   displayMessageCallback = displayMessage;
-  const apiKey = prompt("Enter your Gemini API Key:");
   if (!apiKey) {
     console.error("API key is required to connect to Gemini Live API.");
     return;
@@ -20,7 +62,7 @@ export function initWebRTC(displayMessage) {
       setup: {
         model: "models/gemini-2.0-flash-live-001",
         generationConfig: {
-          responseModalities: ["TEXT"]
+          responseModalities: ["AUDIO"]
         }
       }
     };
@@ -35,10 +77,19 @@ export function initWebRTC(displayMessage) {
         try {
           const json = JSON.parse(reader.result);
           console.log("Parsed blob content:", JSON.stringify(json, null, 2));
-          if (json.serverContent && json.serverContent.modelTurn && json.serverContent.modelTurn.parts) {
-            const textResponse = json.serverContent.modelTurn.parts.map(part => part.text).join("");
-            if (displayMessageCallback) {
-              displayMessageCallback("Gemini", textResponse);
+          if (json.serverContent) {
+            if (json.serverContent.modelTurn && json.serverContent.modelTurn.parts) {
+              const textResponse = json.serverContent.modelTurn.parts.map(part => part.text).join("");
+              if (displayMessageCallback) {
+                displayMessageCallback("Gemini", textResponse);
+              }
+              // Check for audio data within modelTurn.parts
+              const audioPart = json.serverContent.modelTurn.parts.find(part => part.inlineData && part.inlineData.mimeType.startsWith('audio/'));
+              if (audioPart) {
+                const audioData = atob(audioPart.inlineData.data);
+                const audioBlob = new Blob([Uint8Array.from(audioData.split("").map(char => char.charCodeAt(0)))], { type: audioPart.inlineData.mimeType });
+                playAudio(audioBlob);
+              }
             }
           }
         } catch (e) {
