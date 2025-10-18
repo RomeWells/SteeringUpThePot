@@ -1,7 +1,9 @@
 
 let ws;
+let displayMessageCallback;
 
-export function initWebRTC() {
+export function initWebRTC(displayMessage) {
+  displayMessageCallback = displayMessage;
   const apiKey = prompt("Enter your Gemini API Key:");
   if (!apiKey) {
     console.error("API key is required to connect to Gemini Live API.");
@@ -28,12 +30,17 @@ export function initWebRTC() {
   ws.onmessage = (event) => {
     if (event.data instanceof Blob) {
       console.log("Received blob from Gemini:", event.data);
-      // We can try to read the blob as text to see if it contains a message
       const reader = new FileReader();
       reader.onload = () => {
         try {
           const json = JSON.parse(reader.result);
           console.log("Parsed blob content:", JSON.stringify(json, null, 2));
+          if (json.serverContent && json.serverContent.modelTurn && json.serverContent.modelTurn.parts) {
+            const textResponse = json.serverContent.modelTurn.parts.map(part => part.text).join("");
+            if (displayMessageCallback) {
+              displayMessageCallback("Gemini", textResponse);
+            }
+          }
         } catch (e) {
           console.log("Blob content is not JSON:", reader.result);
         }
