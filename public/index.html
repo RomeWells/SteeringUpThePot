@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Gemini Live Demo</title>
+  <style>
+    video { width: 45%; margin: 10px; border: 1px solid #ccc; }
+    #controls { margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Gemini Live WebRTC Demo</h1>
+
+  <video id="localVideo" autoplay muted></video>
+  <video id="remoteVideo" autoplay></video>
+
+  <div id="controls">
+    <button id="startBtn">Launch WebSocket</button>
+    <input type="text" id="messageInput" placeholder="Enter a message"/>
+    <button id="sendMessageBtn">Send Message</button>
+  </div>
+
+  <script type="module" src="./main.js" defer></script>
+</body>
+</html>

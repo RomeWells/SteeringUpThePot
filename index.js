@@ -1,80 +1,65 @@
-const express = require("express");
-const path = require("path");
-const bodyParser = require("body-parser");
-const admin = require("firebase-admin");
-const fetch = require("node-fetch"); // for Gemini Live API calls
-const cors = require("cors");
-require('dotenv').config();
+import "dotenv/config";
+import express from "express";
+import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
+import fetch from "node-fetch";
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+console.log("---- Server script starting ----");
 
-// ===== EXPRESS SETUP =====
-const app = express();          // <-- Initialize app first
-app.use(cors());                // <-- Now you can use cors
-app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname)));
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// ===== FIREBASE SETUP =====
-const serviceAccount = require("./serviceAccountKey.json");
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
-const db = admin.firestore();
+const app = express();
 
-// ===== ROUTES =====
+// Middleware
+app.use(cors());
+app.use(express.json()); // Use express.json() instead of bodyParser
+app.use(express.static(path.join(__dirname, "public")));
 
-// Root
-app.get("/", (req, res) => res.sendFile(path.join(__dirname, "index.html")));
-
-// Health check
-app.get("/health", (req, res) => res.status(200).send("ok"));
-
-// ===== WEBRTC SIGNALING =====
-app.post("/webrtc/offer", async (req, res) => {
-  const { userId, sdpOffer, context } = req.body;
-  console.log("Received WebRTC offer from user:", userId, context);
-
-  // Store context in Firestore
-  await db.collection("sessions").doc(userId).set({ context }, { merge: true });
-
+// WebRTC connection endpoint
+app.post("/webrtc/connect", async (req, res) => {
+  console.log("✅ POST /webrtc/connect endpoint hit");
   try {
-    const geminiResponse = await fetch("https://api.geminilive.ai/v1/webrtc/offer", {
-      method: "POST",
+    const offerSdp = req.body.sdp;
+    if (!offerSdp) {
+      return res.status(400).json({ error: "SDP offer is missing" });
+    }
+
+    const googleApiUrl = 'https://gemini.googleapis.com/v1/liveSessions:create?model=gemini-live-1';
+
+    console.log("Forwarding offer to Google API...");
+    const response = await fetch(googleApiUrl, {
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${GEMINI_API_KEY}`,
+        'Authorization': `Bearer ${process.env.GOOGLE_API_KEY}`,
+        'Content-Type': 'application/sdp',
       },
-      body: JSON.stringify({ sdpOffer, userId, context }),
+      body: offerSdp,
     });
 
-    const data = await geminiResponse.json();
-    const answerSdp = data.answerSdp;
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("❌ Google API Error:", response.status, errorText);
+      return res.status(response.status).json({ error: "Failed to connect to Gemini API", details: errorText });
+    }
 
-    res.json({ answerSdp });
-  } catch (err) {
-    console.error("Gemini Live error:", err);
-    res.json({ answerSdp: sdpOffer }); // fallback
+    const answerSdp = await response.text();
+    console.log("✅ Received SDP answer from Google API.");
+    res.json({ sdp: answerSdp });
+
+  } catch (error) {
+    console.error("❌ Internal Server Error:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-// ===== EMOTION / GESTURE LOGGING =====
-app.post("/emotion", async (req, res) => {
-  const { userId, emotions, gestures } = req.body;
-  console.log("Emotion & gesture update:", userId, emotions, gestures);
-
-  await db.collection("sessions").doc(userId).set({ emotions, gestures }, { merge: true });
-  res.sendStatus(200);
+// Fallback for SPA
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "public/index.html"));
 });
 
-// ===== STEP TRACKING =====
-app.post("/step", async (req, res) => {
-  const { userId, step } = req.body;
-  console.log("User progressed to step:", userId, step);
-
-  await db.collection("sessions").doc(userId).set({ step }, { merge: true });
-  res.sendStatus(200);
+const PORT = process.env.PORT || 8081;
+app.listen(PORT, () => {
+  console.log(`✅ Server is running on http://localhost:${PORT}`);
 });
-
-// ===== START SERVER =====
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
