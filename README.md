@@ -16,3 +16,6 @@ your url is: https://my-steering-up.loca.lt
 more info on my youtube channel 
 
 https://www.youtube.com/live/M3FsmGM67u8?si=uKFrrxegbOvY4YlX
+
+If you want to learn how to build tik tok shop pet store join this free community
+https://client.freedomfusionsystem.com/courses/offers/5d2c7723-a0a0-4f40-99dc-359f89baaee0
