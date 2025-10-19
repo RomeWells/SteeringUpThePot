@@ -1,15 +1,19 @@
-import { initWebRTC, sendTextMessage } from './webrtc.js';
+import { initWebRTC, sendTextMessage, startAudioStreaming, stopAudioStreaming } from './webrtc.js';
 
 const startBtn = document.getElementById('startBtn');
 const sendMessageBtn = document.getElementById('sendMessageBtn');
 const messageInput = document.getElementById('messageInput');
 const localVideo = document.getElementById('localVideo');
 const chatContainer = document.getElementById('chat-container');
+const startSpeakingBtn = document.getElementById('startSpeakingBtn');
+
+let audioStream; // To hold the stream from getUserMedia
 
 async function setupCamera() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
     localVideo.srcObject = stream;
+    audioStream = stream; // Store audio stream for recording
   } catch (error) {
     console.error('Error accessing media devices.', error);
   }
@@ -39,5 +43,21 @@ sendMessageBtn.onclick = () => {
     displayMessage("You", message);
     sendTextMessage(message);
     messageInput.value = '';
+  }
+};
+
+startSpeakingBtn.onclick = () => {
+  if (startSpeakingBtn.textContent === 'Start Speaking') {
+    if (audioStream) {
+      startAudioStreaming(audioStream);
+      startSpeakingBtn.textContent = 'Stop Speaking';
+      displayMessage("You", "[Speaking...]");
+    } else {
+      console.error("Audio stream not available. Please launch WebSocket first.");
+    }
+  } else {
+    stopAudioStreaming();
+    startSpeakingBtn.textContent = 'Start Speaking';
+    displayMessage("You", "[Stopped Speaking]");
   }
 };

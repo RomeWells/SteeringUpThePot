@@ -5,6 +5,11 @@ let audioContext;
 let audioQueue = [];
 let isPlaying = false;
 
+// For real-time audio streaming
+let audioInput;
+let processor;
+let globalAudioStream; // To hold the stream from getUserMedia
+
 async function playAudio(audioBlob) {
   if (!audioContext) {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -104,7 +109,7 @@ export function initWebRTC(displayMessage, apiKey) {
       } catch (e) {
         console.error("Failed to parse JSON from string:", event.data);
       }
-    } else {
+      } else {
       console.log("Received unexpected data from Gemini:", event.data);
     }
   };
@@ -129,6 +134,77 @@ export function sendTextMessage(message) {
     console.log("Sent to Gemini:", clientMessage);
   } else {
     console.warn("WebSocket is not open. Cannot send data.");
+  }
+}
+
+export function startAudioStreaming(stream) {
+  globalAudioStream = stream;
+  audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  audioInput = audioContext.createMediaStreamSource(stream);
+  processor = audioContext.createScriptProcessor(4096, 1, 1); // Buffer size, input channels, output channels
+
+  processor.onaudioprocess = (e) => {
+    const inputData = e.inputBuffer.getChannelData(0);
+    const output = new Int16Array(inputData.length);
+    for (let i = 0; i < inputData.length; i++) {
+      output[i] = Math.min(1, Math.max(-1, inputData[i])) * 0x7FFF; // Convert to 16-bit PCM
+    }
+    const base64data = btoa(String.fromCharCode.apply(null, new Uint8Array(output.buffer)));
+
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      const clientMessage = {
+        realtimeInput: {
+          audio: {
+            data: base64data,
+            mimeType: "audio/pcm;rate=24000" // Specify PCM and rate
+          }
+        }
+      };
+      ws.send(JSON.stringify(clientMessage));
+    }
+  };
+
+  audioInput.connect(processor);
+  processor.connect(audioContext.destination); // Connect to destination to keep it alive
+  console.log("Audio streaming started.");
+}
+
+export function stopAudioStreaming() {
+  if (globalAudioStream) {
+    globalAudioStream.getTracks().forEach(track => track.stop());
+  }
+  if (audioInput) {
+    audioInput.disconnect();
+  }
+  if (processor) {
+    processor.disconnect();
+  }
+  if (audioContext) {
+    audioContext.close();
+    audioContext = null;
+  }
+  console.log("Audio streaming stopped.");
+}
+
+export function sendAudioMessage(audioBlob) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64data = reader.result.split(',')[1];
+      const clientMessage = {
+        realtimeInput: {
+          audio: {
+            data: base64data,
+            mimeType: audioBlob.type
+          }
+        }
+      };
+      ws.send(JSON.stringify(clientMessage));
+      console.log("Sent audio to Gemini:", clientMessage);
+    };
+    reader.readAsDataURL(audioBlob);
+  } else {
+    console.warn("WebSocket is not open. Cannot send audio data.");
   }
 }
 
