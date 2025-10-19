@@ -1,4 +1,4 @@
-import { initWebRTC, sendTextMessage, startAudioStreaming, stopAudioStreaming } from './webrtc.js';
+import { initWebRTC, sendTextMessage, startAudioStreaming, stopAudioStreaming, audioContext } from './webrtc.js';
 
 const startBtn = document.getElementById('startBtn');
 const sendMessageBtn = document.getElementById('sendMessageBtn');
@@ -34,7 +34,7 @@ startBtn.onclick = async () => {
   }
   await setupCamera();
   await initWebRTC(displayMessage, apiKey);
-  console.log('WebSocket connection initiated');
+  console.log('WebRTC connection initiated');
 };
 
 sendMessageBtn.onclick = () => {
@@ -49,11 +49,14 @@ sendMessageBtn.onclick = () => {
 startSpeakingBtn.onclick = () => {
   if (startSpeakingBtn.textContent === 'Start Speaking') {
     if (audioStream) {
+      if (audioContext && audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
       startAudioStreaming(audioStream);
       startSpeakingBtn.textContent = 'Stop Speaking';
       displayMessage("You", "[Speaking...]");
     } else {
-      console.error("Audio stream not available. Please launch WebSocket first.");
+      console.error("Audio stream not available. Please launch WebRTC connection first.");
     }
   } else {
     stopAudioStreaming();

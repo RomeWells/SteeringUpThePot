@@ -1,7 +1,7 @@
 
 let ws;
 let displayMessageCallback;
-let audioContext;
+export let audioContext;
 let audioQueue = [];
 let isPlaying = false;
 
@@ -140,7 +140,7 @@ export function sendTextMessage(message) {
 
 export async function startAudioStreaming(stream) {
   globalAudioStream = stream;
-  audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
 
   // Load the AudioWorklet processor
   try {
