@@ -2,6 +2,14 @@ This is the REPO that makes it easy to communicate in real time with Live Gemini
 
 Runs Locally on your computer but you can access it on your iphone.
 
+
+Note FireBase Integration is stripped out of this, but will later be added.
+
+This version makes it possible for you to have a very good proof of concept of communicating with Gemini Live API.
+
+Later this can be connected to Iphone Shortcut steps, guiding users throughout the process of building their Tik Tok Luxury Pet store.
+
+
 Later you can transfer it cloud run to run in containerized environment on demand.
 
 How to use it 
