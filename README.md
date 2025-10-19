@@ -1,5 +1,9 @@
 This is the REPO that makes it easy to communicate in real time with Live Gemini API from your iphone and desktop.
 
+Runs Locally on your computer but you can access it on your iphone.
+
+Later you can transfer it cloud run to run in containerized environment on demand.
+
 How to use it 
 
 node index.js
