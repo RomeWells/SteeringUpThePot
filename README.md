@@ -12,3 +12,7 @@ example
 
 C:\Users\Roman>npx localtunnel --port 8083 --subdomain my-steering-up
 your url is: https://my-steering-up.loca.lt
+
+more info on my youtube channel 
+
+https://www.youtube.com/live/M3FsmGM67u8?si=uKFrrxegbOvY4YlX
