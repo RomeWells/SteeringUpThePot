@@ -7,8 +7,9 @@ let isPlaying = false;
 
 // For real-time audio streaming
 let audioInput;
-let processor;
+let processor; // Keep processor for now, will remove later if not needed
 let globalAudioStream; // To hold the stream from getUserMedia
+let audioWorkletNode; // Declare audioWorkletNode globally
 
 async function playAudio(audioBlob) {
   if (!audioContext) {
@@ -137,19 +138,24 @@ export function sendTextMessage(message) {
   }
 }
 
-export function startAudioStreaming(stream) {
+export async function startAudioStreaming(stream) {
   globalAudioStream = stream;
   audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  audioInput = audioContext.createMediaStreamSource(stream);
-  processor = audioContext.createScriptProcessor(4096, 1, 1); // Buffer size, input channels, output channels
 
-  processor.onaudioprocess = (e) => {
-    const inputData = e.inputBuffer.getChannelData(0);
-    const output = new Int16Array(inputData.length);
-    for (let i = 0; i < inputData.length; i++) {
-      output[i] = Math.min(1, Math.max(-1, inputData[i])) * 0x7FFF; // Convert to 16-bit PCM
-    }
-    const base64data = btoa(String.fromCharCode.apply(null, new Uint8Array(output.buffer)));
+  // Load the AudioWorklet processor
+  try {
+    await audioContext.audioWorklet.addModule('./audio-processor.js');
+  } catch (e) {
+    console.error('Error loading AudioWorklet module:', e);
+    return;
+  }
+
+  audioInput = audioContext.createMediaStreamSource(stream);
+  audioWorkletNode = new AudioWorkletNode(audioContext, 'audio-processor');
+
+  audioWorkletNode.port.onmessage = (event) => {
+    const pcmData = new Int16Array(event.data);
+    const base64data = btoa(String.fromCharCode.apply(null, new Uint8Array(pcmData.buffer)));
 
     if (ws && ws.readyState === WebSocket.OPEN) {
       const clientMessage = {
@@ -164,8 +170,8 @@ export function startAudioStreaming(stream) {
     }
   };
 
-  audioInput.connect(processor);
-  processor.connect(audioContext.destination); // Connect to destination to keep it alive
+  audioInput.connect(audioWorkletNode);
+  audioWorkletNode.connect(audioContext.destination); // Connect to destination to keep it alive
   console.log("Audio streaming started.");
 }
 
@@ -176,8 +182,8 @@ export function stopAudioStreaming() {
   if (audioInput) {
     audioInput.disconnect();
   }
-  if (processor) {
-    processor.disconnect();
+  if (audioWorkletNode) { // Disconnect AudioWorkletNode
+    audioWorkletNode.disconnect();
   }
   if (audioContext) {
     audioContext.close();
