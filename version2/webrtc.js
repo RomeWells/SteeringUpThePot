@@ -11,6 +11,9 @@ let globalAudioStream;
 let audioWorkletNode;
 
 async function playAudio(audioBlob) {
+  if (audioContext && audioContext.state === 'suspended') {
+    await audioContext.resume();
+  }
   audioQueue.push(audioBlob);
 
   if (!isPlaying) {
@@ -22,14 +25,19 @@ async function processQueue() {
   if (audioQueue.length > 0 && !isPlaying) {
     isPlaying = true;
     const audioBlob = audioQueue.shift();
+    console.log("Processing audio blob:", audioBlob);
     try {
       const arrayBuffer = await audioBlob.arrayBuffer();
+      console.log("ArrayBuffer created, length:", arrayBuffer.byteLength);
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer); // Use decodeAudioData for proper audio decoding
+      console.log("AudioBuffer decoded, duration:", audioBuffer.duration);
       const source = audioContext.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(audioContext.destination);
       source.start(0);
+      console.log("Audio source started.");
       source.onended = () => {
+        console.log("Audio playback ended.");
         isPlaying = false;
         processQueue();
       };
@@ -63,13 +71,18 @@ export async function initWebRTC(displayMessage, apiKey) { // Removed videoEleme
 
   ws.onmessage = (event) => {
     if (event.data instanceof Blob) {
-      console.log("Received blob from Gemini:", event.data);
+      console.log("Received blob from Gemini:", event.data, "Type:", event.data.type);
       const reader = new FileReader();
-      reader.onload = async () => { // Made onload async
+      reader.onload = async () => {
         try {
+          // First, try to parse as JSON
           const json = JSON.parse(reader.result);
-          console.log("Parsed blob content:", JSON.stringify(json, null, 2));
-          if (json.serverContent) {
+          console.log("Parsed blob content as JSON:", JSON.stringify(json, null, 2));
+
+          if (json.setupComplete) {
+            // Handle setup complete message
+            console.log("Gemini setup complete.");
+          } else if (json.serverContent) {
             if (json.serverContent.modelTurn && json.serverContent.modelTurn.parts) {
               const textResponse = json.serverContent.modelTurn.parts.map(part => part.text).join("");
               if (displayMessageCallback) {
@@ -77,25 +90,37 @@ export async function initWebRTC(displayMessage, apiKey) { // Removed videoEleme
               }
               const audioPart = json.serverContent.modelTurn.parts.find(part => part.inlineData && part.inlineData.mimeType.startsWith('audio/'));
               if (audioPart) {
+                console.log("Found audio part in Gemini response (within JSON).", audioPart);
                 const audioData = atob(audioPart.inlineData.data);
+                console.log("Decoded base64 audio data, length:", audioData.length);
                 const pcmData = new Uint8Array(audioData.length);
                 for (let i = 0; i < audioData.length; i++) {
                   pcmData[i] = audioData.charCodeAt(i);
                 }
+                console.log("Created PCM data, length:", pcmData.length);
                 const wavBlob = createWaveBlob(pcmData.buffer, { sampleRate: 24000 });
+                console.log("Created WAV blob:", wavBlob);
                 playAudio(wavBlob);
+                console.log("playAudio function called.");
               }
             }
           }
         } catch (e) {
-          console.log("Blob content is not JSON:", reader.result);
+          // If JSON parsing fails, assume it's a raw audio blob
+          console.log("Blob content is not JSON, attempting to process as raw audio.", e);
+          const audioDataBuffer = await event.data.arrayBuffer(); // Get ArrayBuffer directly from the blob
+          console.log("Received raw audio blob, length:", audioDataBuffer.byteLength);
+          const wavBlob = createWaveBlob(audioDataBuffer, { sampleRate: 24000 });
+          console.log("Created WAV blob from raw audio blob:", wavBlob);
+          playAudio(wavBlob);
+          console.log("playAudio function called for raw audio blob.");
         }
       };
-      reader.readAsText(event.data);
+      reader.readAsText(event.data); // Still read as text initially to attempt JSON parse
     } else if (typeof event.data === 'string') {
       try {
         const json = JSON.parse(event.data);
-        console.log("Received from Gemini:", json);
+        console.log("Received from Gemini (string JSON):", json);
       } catch (e) {
         console.error("Failed to parse JSON from string:", event.data);
       }
@@ -114,14 +139,17 @@ export async function initWebRTC(displayMessage, apiKey) { // Removed videoEleme
 }
 
 function createWaveBlob(pcmData, options) {
-  const numFrames = pcmData.byteLength / 2;
+  // pcmData is expected to be an ArrayBuffer
   const numChannels = options.numChannels || 1;
   const sampleRate = options.sampleRate || 24000;
-  const bytesPerSample = 2;
-  const blockAlign = numChannels * bytesPerSample;
-  const byteRate = sampleRate * blockAlign;
+  const bytesPerSample = 2; // 16-bit PCM
+  const blockAlign = numChannels * bytesPerSample; // 1 channel * 2 bytes/sample = 2
+  
+  const numFrames = Math.floor(pcmData.byteLength / bytesPerSample);
   const dataSize = numFrames * blockAlign;
-  const waveFileSize = 36 + dataSize;
+
+  // Corrected waveFileSize calculation: 12 (RIFF) + 24 (fmt) + 8 (data chunk header) + dataSize
+  const waveFileSize = 44 + dataSize;
 
   const buffer = new ArrayBuffer(waveFileSize);
   const view = new DataView(buffer);
@@ -130,7 +158,7 @@ function createWaveBlob(pcmData, options) {
 
   // RIFF header
   writeString(view, offset, 'RIFF'); offset += 4;
-  view.setUint32(offset, waveFileSize, true); offset += 4;
+  view.setUint32(offset, waveFileSize - 8, true); offset += 4; // ChunkSize
   writeString(view, offset, 'WAVE'); offset += 4;
 
   // fmt chunk
@@ -139,9 +167,10 @@ function createWaveBlob(pcmData, options) {
   view.setUint16(offset, 1, true); offset += 2; // AudioFormat (PCM)
   view.setUint16(offset, numChannels, true); offset += 2;
   view.setUint32(offset, sampleRate, true); offset += 4;
+  const byteRate = sampleRate * blockAlign; // Added this line
   view.setUint32(offset, byteRate, true); offset += 4;
   view.setUint16(offset, blockAlign, true); offset += 2;
-  view.setUint16(offset, 16, true); offset += 2; // BitsPerSample
+  view.setUint16(offset, bytesPerSample * 8, true); offset += 2; // BitsPerSample
 
   // data chunk
   writeString(view, offset, 'data'); offset += 4;
@@ -178,7 +207,7 @@ export function sendTextMessage(message) {
 
 export async function startAudioStreaming(stream) {
   globalAudioStream = stream;
-  audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+  audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
 
   try {
     await audioContext.audioWorklet.addModule('./audio-processor.js');
