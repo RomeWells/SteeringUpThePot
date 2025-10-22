@@ -1,0 +1,33 @@
+This is the REPO that makes it easy to communicate in real time with Live Gemini API from your iphone and desktop.
+
+Runs Locally on your computer but you can access it on your iphone.
+
+
+Note FireBase Integration is stripped out of this, but will later be added.
+
+This version makes it possible for you to have a very good proof of concept of communicating with Gemini Live API.
+
+Later this can be connected to Iphone Shortcut steps, guiding users throughout the process of building their Tik Tok Luxury Pet store.
+
+
+Later you can transfer it cloud run to run in containerized environment on demand.
+
+How to use it 
+
+node index.js
+
+npx localtunnel --port 8081 --subdomain [pick name for your app]
+
+run it in browser with the name 
+
+example 
+
+C:\Users\Roman>npx localtunnel --port 8083 --subdomain my-steering-up
+your url is: https://my-steering-up.loca.lt
+
+more info on my youtube channel 
+
+https://www.youtube.com/live/M3FsmGM67u8?si=uKFrrxegbOvY4YlX
+
+If you want to learn how to build tik tok shop pet store join this free community
+https://client.freedomfusionsystem.com/courses/offers/5d2c7723-a0a0-4f40-99dc-359f89baaee0
