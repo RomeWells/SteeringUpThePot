@@ -47,6 +47,11 @@
       min-height: max(884px, 100dvh);
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script type="module" src="./firebase.js" defer></script>
+  <script type="module" src="./gestures.js" defer></script>
   <script type="module" src="./webrtc.js" defer></script>
   <script type="module" src="./main.js" defer></script>
 </head>
@@ -55,19 +60,27 @@
     <div class="flex-grow">
       <header class="px-4 pt-8 pb-4">
         <h1 class="text-2xl font-bold text-center">Steering Up The Pot 🔥</h1>
+        <img src="SteeringUpThePot.png" alt="Steering Up The Pot Logo" class="max-w-full h-auto mx-auto block mt-4 mb-4" />
       </header>
       <main class="px-4 space-y-3">
+        <div id="avatar-container" class="fixed bottom-20 right-4">
+          <div id="avatar" class="w-16 h-16 bg-primary rounded-full shadow-lg flex items-center justify-center text-3xl text-text-light dark:text-text-dark">
+            😊
+          </div>
+        </div>
         <!-- Existing WebRTC elements will go here -->
         <div class="webrtc-container">
           <h1>Gemini Live WebRTC Demo</h1>
           <video id="localVideo" autoplay muted></video>
           <video id="remoteVideo" autoplay></video>
           <div id="chat-container"></div>
+          <p id="gesture-detected">Gesture: None</p>
           <div id="controls">
             <button id="startBtn">Launch WebSocket</button>
             <input type="text" id="messageInput" placeholder="Enter a message"/>
             <button id="sendMessageBtn">Send Message</button>
             <button id="startSpeakingBtn">Start Speaking</button>
+            <button id="test-step-btn">Test Step 1</button>
           </div>
         </div>
 
@@ -77,7 +90,7 @@
             <p class="text-xs text-subtle-light dark:text-subtle-dark font-medium uppercase tracking-wider">Step 1</p>
             <p class="text-lg font-bold">Doom Scroll to find TikTok video</p>
           </div>
-          <button class="bg-primary/20 dark:bg-primary/30 text-text-light dark:text-text-dark font-bold py-2 px-4 rounded-lg text-sm transition-transform active:scale-95">
+          <button id="step1-btn" class="bg-primary/20 dark:bg-primary/30 text-text-light dark:text-text-dark font-bold py-2 px-4 rounded-lg text-sm transition-transform active:scale-95">
             Launch Shortcut
           </button>
         </div>
@@ -86,7 +99,7 @@
             <p class="text-xs text-subtle-light dark:text-subtle-dark font-medium uppercase tracking-wider">Step 2</p>
             <p class="text-lg font-bold">Find Viral Comment</p>
           </div>
-          <button class="bg-primary/20 dark:bg-primary/30 text-text-light dark:text-text-dark font-bold py-2 px-4 rounded-lg text-sm transition-transform active:scale-95">
+          <button id="step2-btn" class="bg-primary/20 dark:bg-primary/30 text-text-light dark:text-text-dark font-bold py-2 px-4 rounded-lg text-sm transition-transform active:scale-95">
             Launch Shortcut
           </button>
         </div>
@@ -95,7 +108,7 @@
             <p class="text-xs text-subtle-light dark:text-subtle-dark font-medium uppercase tracking-wider">Step 3</p>
             <p class="text-lg font-bold">Remix Voice</p>
           </div>
-          <button class="bg-primary/20 dark:bg-primary/30 text-text-light dark:text-text-dark font-bold py-2 px-4 rounded-lg text-sm transition-transform active:scale-95">
+          <button id="step3-btn" class="bg-primary/20 dark:bg-primary/30 text-text-light dark:text-text-dark font-bold py-2 px-4 rounded-lg text-sm transition-transform active:scale-95">
             Launch Shortcut
           </button>
         </div>
@@ -104,7 +117,7 @@
             <p class="text-xs text-subtle-light dark:text-subtle-dark font-medium uppercase tracking-wider">Step 4</p>
             <p class="text-lg font-bold">Create Viral Script</p>
           </div>
-          <button class="bg-primary/20 dark:bg-primary/30 text-text-light dark:text-text-dark font-bold py-2 px-4 rounded-lg text-sm transition-transform active:scale-95">
+          <button id="step4-btn" class="bg-primary/20 dark:bg-primary/30 text-text-light dark:text-text-dark font-bold py-2 px-4 rounded-lg text-sm transition-transform active:scale-95">
             Launch Shortcut
           </button>
         </div>
@@ -113,7 +126,7 @@
             <p class="text-xs text-subtle-light dark:text-subtle-dark font-medium uppercase tracking-wider">Step 5</p>
             <p class="text-lg font-bold">Blast it Across Socials</p>
           </div>
-          <button class="bg-primary/20 dark:bg-primary/30 text-text-light dark:text-text-dark font-bold py-2 px-4 rounded-lg text-sm transition-transform active:scale-95">
+          <button id="step5-btn" class="bg-primary/20 dark:bg-primary/30 text-text-light dark:text-text-dark font-bold py-2 px-4 rounded-lg text-sm transition-transform active:scale-95">
             Launch Shortcut
           </button>
         </div>
@@ -121,7 +134,7 @@
       <div class="p-4 mt-4">
         <p class="text-sm font-medium mb-2 text-subtle-light dark:text-subtle-dark">Automation Progress</p>
         <div class="w-full bg-primary/20 rounded-full h-2.5">
-          <div class="bg-primary h-2.5 rounded-full" style="width: 20%"></div>
+          <div id="progress-bar-inner" class="bg-primary h-2.5 rounded-full" style="width: 20%"></div>
         </div>
       </div>
     </div>
