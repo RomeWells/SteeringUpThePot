@@ -12,8 +12,11 @@ let globalAudioStream; // To hold the stream from getUserMedia
 let audioWorkletNode; // Declare audioWorkletNode globally
 
 async function playAudio(audioBlob) {
-  if (!audioContext) {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  if (!audioContext || audioContext.sampleRate !== 24000) { // Check if context exists and has correct sample rate
+    if (audioContext) { // Close existing context if sample rate is wrong
+      await audioContext.close();
+    }
+    audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
   }
 
   audioQueue.push(audioBlob);
@@ -140,7 +143,7 @@ export function sendTextMessage(message) {
 
 export async function startAudioStreaming(stream) {
   globalAudioStream = stream;
-  audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+  audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
 
   // Load the AudioWorklet processor
   try {
